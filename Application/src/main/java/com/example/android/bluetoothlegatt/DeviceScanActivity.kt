@@ -23,6 +23,9 @@ import android.app.ListActivity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
@@ -51,6 +54,7 @@ import android.content.ContentValues.TAG
 class DeviceScanActivity : ListActivity() {
     private var mLeDeviceListAdapter: LeDeviceListAdapter? = null
     private var mBluetoothAdapter: BluetoothAdapter? = null
+    private var mLeScanner: BluetoothLeScanner? = null
     private var mScanning: Boolean = false
     private var mHandler: Handler? = null
 
@@ -93,6 +97,8 @@ class DeviceScanActivity : ListActivity() {
             finish()
             return
         }
+
+        mLeScanner = mBluetoothAdapter!!.getBluetoothLeScanner();
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -268,6 +274,17 @@ class DeviceScanActivity : ListActivity() {
         }
     }
 
+    // Starting from Android Build.VERSION_CODES.LOLLIPOP we use android.bluetooth.le.ScanCallback
+//    private val scanCallback = object : ScanCallback() {
+//        override fun onScanResult(callbackType: Int, result: ScanResult) {
+//            with(result.device) {
+//                Log.i("ScanCallback", "Found BLE device! Name: ${name ?: "Unnamed"}, address: $address")
+//            }
+//        }
+//    }
+
+
+    // Old method
     // Device scan callback.
     private val mLeScanCallback = BluetoothAdapter.LeScanCallback { device, rssi, scanRecord ->
         runOnUiThread {
