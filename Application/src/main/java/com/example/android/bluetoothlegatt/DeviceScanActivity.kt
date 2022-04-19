@@ -27,7 +27,6 @@ import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -47,6 +46,7 @@ import android.widget.Toast
 import java.util.ArrayList
 
 import android.content.ContentValues.TAG
+import androidx.core.app.ActivityCompat
 
 /**
  * Activity for scanning and displaying available Bluetooth LE devices.
@@ -66,13 +66,22 @@ class DeviceScanActivity : ListActivity() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // Android M Permission check
-            if (this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (this.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 val builder = AlertDialog.Builder(this)
                 builder.setTitle("This app needs location access")
                 builder.setMessage("Please grant location access so this app can detect beacons.")
                 builder.setPositiveButton(android.R.string.ok, null)
                 builder.setOnDismissListener {
-                    // requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_COARSE_LOCATION);
+
+                    val permIds = mutableListOf(Manifest.permission.BLUETOOTH
+                        ,Manifest.permission.ACCESS_COARSE_LOCATION
+                        ,Manifest.permission.ACCESS_FINE_LOCATION
+                    )
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        permIds.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                    }
+                    ActivityCompat.requestPermissions(this, permIds.toTypedArray(), 1)
+                    //requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_COARSE_LOCATION);
                 }
                 builder.show()
             }
@@ -188,7 +197,7 @@ class DeviceScanActivity : ListActivity() {
         intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, device.name)
         intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, device.address)
         if (mScanning) {
-            mBluetoothAdapter!!.stopLeScan(mLeScanCallback)
+            mLeScanner!!.stopScan(mLeScanCallback)
             mScanning = false
         }
         startActivity(intent)
@@ -199,18 +208,22 @@ class DeviceScanActivity : ListActivity() {
             // Stops scanning after a pre-defined scan period.
             mHandler!!.postDelayed({
                 mScanning = false
-                mBluetoothAdapter!!.stopLeScan(mLeScanCallback)
+                mLeScanner!!.stopScan(mLeScanCallback)
                 invalidateOptionsMenu()
             }, SCAN_PERIOD)
 
             mScanning = true
-            mBluetoothAdapter!!.startLeScan(mLeScanCallback)
+            mLeScanner!!.startScan(mLeScanCallback)
         } else {
             mScanning = false
-            mBluetoothAdapter!!.stopLeScan(mLeScanCallback)
+            mLeScanner!!.stopScan(mLeScanCallback)
         }
         invalidateOptionsMenu()
     }
+
+
+
+
 
     // Adapter for holding devices found through scanning.
     private inner class LeDeviceListAdapter : BaseAdapter() {
@@ -275,18 +288,26 @@ class DeviceScanActivity : ListActivity() {
     }
 
     // Starting from Android Build.VERSION_CODES.LOLLIPOP we use android.bluetooth.le.ScanCallback
-//    private val scanCallback = object : ScanCallback() {
-//        override fun onScanResult(callbackType: Int, result: ScanResult) {
-//            with(result.device) {
-//                Log.i("ScanCallback", "Found BLE device! Name: ${name ?: "Unnamed"}, address: $address")
-//            }
-//        }
-//    }
+    private val mLeScanCallback = object : ScanCallback() {
+
+        override fun onScanResult(callbackType: Int, result: ScanResult) {
+            with(result.device) {
+                Log.i("ScanCallback", "Found BLE device! Name: ${name ?: "Unnamed"}, address: $address")
+            }
+            mLeDeviceListAdapter!!.addDevice(result.device)
+            mLeDeviceListAdapter!!.notifyDataSetChanged()
+        }
+
+        override fun onScanFailed(errorCode: Int) {
+            Log.e("ScanCallback", "onScanFailed: code $errorCode")
+        }
+
+    }
 
 
     // Old method
     // Device scan callback.
-    private val mLeScanCallback = BluetoothAdapter.LeScanCallback { device, rssi, scanRecord ->
+    private val mLeScanCallbackOld = BluetoothAdapter.LeScanCallback { device, rssi, scanRecord ->
         runOnUiThread {
             mLeDeviceListAdapter!!.addDevice(device)
             mLeDeviceListAdapter!!.notifyDataSetChanged()
